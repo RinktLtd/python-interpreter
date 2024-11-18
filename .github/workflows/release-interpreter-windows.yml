@@ -69,28 +69,3 @@ jobs:
         with:
           name: windows-python-interpreter
           path: interpreters
-
-      - name: Create interpreters directory if it doesn't exist
-        run: mkdir -p interpreters
-
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-
-      - name: Commit and push if there are changes
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            branch_name="${{ github.event.pull_request.head.ref }}"
-          else
-            branch_name="${{ github.ref_name }}"
-          fi
-          
-          git add interpreters
-          git commit -m "Update interpreters" || echo "No changes to commit"
-          git push origin HEAD:$branch_name
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
