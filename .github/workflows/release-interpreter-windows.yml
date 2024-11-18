@@ -32,8 +32,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install numpy pandas pyinstaller
 
-      - name: Build with PyInstaller
-        run: pyinstaller --name=python_data_processor --hidden-import=numpy --hidden-import=pandas --onefile python_interpreter.py
+      - name: Extract Tag Name (Windows)
+        shell: powershell
+        run: |
+            $TAG_NAME = "${{ github.ref }}"
+            $TAG_NAME = $TAG_NAME -replace 'refs/tags/', ''
+            echo "TAG_NAME=$TAG_NAME" >> $env:GITHUB_ENV
+
+      - name: Set binary name variable
+        shell: powershell
+        run: |
+            $BINARY_NAME = "python_data_processor_$env:TAG_NAME.exe"
+            echo "BINARY_NAME=$BINARY_NAME" >> $env:GITHUB_ENV
+
+      - name: Print Binary name
+        run: echo "Binary name is $env:BINARY_NAME"
+
+      - name: Build Python Interpreter with PyInstaller
+        run: |
+          pyinstaller --name=$env:BINARY_NAME --hidden-import=numpy --hidden-import=pandas --onefile python_interpreter.py
 
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v1
@@ -54,8 +71,8 @@ jobs:
       - name: Upload binary as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-python-interpreter
-          path: dist\python_data_processor.exe
+          name: windows-binary
+          path: ${{ env.BINARY_NAME }}
 
   create-release-windows:
     needs: build-windows
