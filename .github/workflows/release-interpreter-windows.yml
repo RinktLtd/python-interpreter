@@ -2,9 +2,8 @@ name: Build and Sign Windows Python Interpreter
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - '*'
 
 permissions:
   contents: write
@@ -58,14 +57,49 @@ jobs:
           name: windows-python-interpreter
           path: dist\python_data_processor.exe
 
-  commit-and-push-interpreter:
+  create-release-windows:
     needs: build-windows
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Extract Tag Name
+        id: extract_tag
+        run: echo "TAG_NAME=${{ github.ref }}" | sed 's/refs\/tags\///' >> $GITHUB_ENV
+
+      - name: Print Tag Name
+        id: print_tag_name
+        run: echo "Tag name is $TAG_NAME"
+
+      - name: Set binary name variable
+        run: echo "BINARY_NAME=python_data_processor_$TAG_NAME.exe" >> $GITHUB_ENV
 
       - name: Download Windows binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: windows-python-interpreter
-          path: interpreters
+          name: windows-binary
+
+      - name: List downloaded files for debugging
+        run: ls -al /home/runner/work/runner/runner
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          release_name: "Release ${{ env.BINARY_NAME }}"
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset for Windows
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: /home/runner/work/runner/runner/${{ env.BINARY_NAME }}
+          asset_name: ${{ env.BINARY_NAME }}
+          asset_content_type: application/octet-stream
