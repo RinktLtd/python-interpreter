@@ -50,7 +50,7 @@ jobs:
 
       - name: Build Python Interpreter with PyInstaller
         run: |
-          pyinstaller --name=$env:BINARY_NAME --hidden-import=numpy --hidden-import=pandas --onefile python_interpreter.py
+          pyinstaller --name=$env:BINARY_NAME --hidden-import=numpy --hidden-import=pandas --hidden-import=pypdf --onefile python_interpreter.py
 
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v1
