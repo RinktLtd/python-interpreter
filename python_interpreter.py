@@ -5,8 +5,11 @@ import traceback
 
 
 def run(source, filename):
+    # os and sys stay importless: scripts ran in this launcher's own namespace
+    # before, and some came to rely on it.
+    namespace = {"__name__": "__main__", "__file__": filename, "os": os, "sys": sys}
     try:
-        exec(compile(source, filename, "exec"), {"__name__": "__main__", "__file__": filename})
+        exec(compile(source, filename, "exec"), namespace)
     except SystemExit:
         raise
     except BaseException as e:
@@ -43,7 +46,9 @@ if __name__ == "__main__":
         run(args[1], "<string>")
     elif os.path.isfile(args[0]):
         sys.argv = args
-        with open(args[0], encoding="utf-8") as f:
+        # Bytes, so compile() decodes them as CPython would: UTF-8 unless a
+        # coding cookie says otherwise, with a BOM allowed.
+        with open(args[0], "rb") as f:
             run(f.read(), args[0])
     else:
         sys.argv = ["-c", *args[1:]]
