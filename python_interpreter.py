@@ -1,59 +1,58 @@
-import sys
 import code
 import os
+import sys
+import traceback
 
-def execute_command(cmd):
+
+def run(source, filename):
+    # os and sys stay importless: scripts ran in this launcher's own namespace
+    # before, and some came to rely on it.
+    namespace = {"__name__": "__main__", "__file__": filename, "os": os, "sys": sys}
     try:
-        exec(cmd)
-    except Exception as e:
-        print(f"Error executing the command: {e}", file=sys.stderr)
+        exec(compile(source, filename, "exec"), namespace)
+    except SystemExit:
+        raise
+    except BaseException as e:
+        # Drop this launcher's frame so the trace starts in the user's script.
+        traceback.print_exception(e.with_traceback(e.__traceback__.tb_next))
         sys.exit(1)
 
+
+def interact():
+    print("Python " + sys.version)
+    print("Type 'exit()' or 'quit()' to exit the interpreter.")
+    code.interact(local={"__name__": "__main__"})
+
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        # Check if the first argument is "-u" (unbuffered output)
-        if sys.argv[1] == "-u":
-            # -u flag means unbuffered output, skip it and process the next argument
-            if len(sys.argv) > 2:
-                arg = sys.argv[2]
-                if os.path.isfile(arg):
-                    try:
-                        # If a script file is provided as an argument, execute it
-                        exec(open(arg).read())
-                    except Exception as e:
-                        print(f"Error executing the script: {e}", file=sys.stderr)
-                        sys.exit(1)
-                else:
-                    # If the argument is not a file, treat it as a Python command
-                    execute_command(arg)
-            else:
-                # No arguments after -u, start interactive interpreter
-                print("Python " + sys.version)
-                print("Type 'exit()' or 'quit()' to exit the interpreter.")
-                code.interact(local=locals())
-        # Check if the first argument is "-c"
-        elif sys.argv[1] == "-c":
-            # Ensure there is a code argument after "-c"
-            if len(sys.argv) > 2:
-                code_to_run = sys.argv[2]
-                execute_command(code_to_run)
-            else:
-                print("Error: '-c' flag provided but no code given", file=sys.stderr)
-                sys.exit(1)
-        else:
-            arg = sys.argv[1]
-            if os.path.isfile(arg):
-                try:
-                    # If a script file is provided as an argument, execute it
-                    exec(open(arg).read())
-                except Exception as e:
-                    print(f"Error executing the script: {e}", file=sys.stderr)
-                    sys.exit(1)
-            else:
-                # If the argument is not a file, treat it as a Python command
-                execute_command(arg)
+    args = sys.argv[1:]
+    # A frozen executable ignores -u, so honour it here: without line buffering
+    # a piped stdout reaches the runner only when the script ends. The runner
+    # reads UTF-8, while a piped stdout on Windows defaults to the ANSI codepage
+    # and raises on the first character outside it.
+    unbuffered = bool(args) and args[0] == "-u"
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8", line_buffering=unbuffered or None)
+    if unbuffered:
+        args = args[1:]
+
+    if not args:
+        interact()
+    elif args[0] == "-c":
+        if len(args) < 2:
+            print("Error: '-c' flag provided but no code given", file=sys.stderr)
+            sys.exit(1)
+        sys.argv = ["-c", *args[2:]]
+        run(args[1], "<string>")
+    elif os.path.isfile(args[0]):
+        sys.argv = args
+        # As CPython does, and a frozen executable does not: the script's own
+        # directory first, so it can import the files beside it.
+        sys.path.insert(0, os.path.dirname(os.path.abspath(args[0])))
+        # Bytes, so compile() decodes them as CPython would: UTF-8 unless a
+        # coding cookie says otherwise, with a BOM allowed.
+        with open(args[0], "rb") as f:
+            run(f.read(), args[0])
     else:
-        # No arguments provided, start an interactive interpreter
-        print("Python " + sys.version)
-        print("Type 'exit()' or 'quit()' to exit the interpreter.")
-        code.interact(local=locals())
+        sys.argv = ["-c", *args[1:]]
+        run(args[0], "<string>")
