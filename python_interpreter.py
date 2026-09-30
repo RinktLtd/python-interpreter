@@ -46,6 +46,9 @@ if __name__ == "__main__":
         run(args[1], "<string>")
     elif os.path.isfile(args[0]):
         sys.argv = args
+        # As CPython does, and a frozen executable does not: the script's own
+        # directory first, so it can import the files beside it.
+        sys.path.insert(0, os.path.dirname(os.path.abspath(args[0])))
         # Bytes, so compile() decodes them as CPython would: UTF-8 unless a
         # coding cookie says otherwise, with a BOM allowed.
         with open(args[0], "rb") as f:
